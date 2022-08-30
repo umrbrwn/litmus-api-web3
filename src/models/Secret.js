@@ -1,4 +1,4 @@
-import { dbcontext } from "./db.js";
+import { dbcontext } from '../modules/db.js';
 
 class Secret {
   static getRandomSecret() {

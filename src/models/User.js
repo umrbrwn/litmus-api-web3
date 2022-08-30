@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { dbcontext } from './db.js';
+import { dbcontext } from '../modules/db.js';
 
 const validations = {
   newUser: Joi.object({

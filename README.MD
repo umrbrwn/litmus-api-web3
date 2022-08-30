@@ -32,6 +32,6 @@ Learn more about Prisma: [Add Prisma to an existing project that uses a relation
 
 ## Setup environment variables:
 Generate RSA keys for bearer token signing and verification.
-1. > ssh-keygen -t rsa -m PEM -b 2048 -C "example@example.com" -f ./certs/cert.pem
+1. > mkdir ./certs && ssh-keygen -t rsa -m PEM -b 2048 -C "example@example.com" -f ./certs/cert.pem
 2. > LITMUS_API_PORT=3000
 3. > DATABASE_URL={POSTGRES-CONNECTION-STRING}
