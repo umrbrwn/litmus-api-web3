@@ -9,14 +9,26 @@ Its token authenticated API that returns random magic strings from Postgres.
 
 The app uses some of the famous npm packages, i.e. `express`, `joi`, `dotenv`, `prisma` ORM, `passport`, `pino` logger with ECS formatting, and more importantly `polkadot` to verify signatures.
 
+## How it works:
+ 1. Call /challengecode API with your address aka username, and it will give you an arbitrary challenge code that expires after 3 minutes.
+ 2. Call /signin API with your username, a message containing your username and the challenge code, signature of the message, and the challenge code
+ 3. If everything works, it will give an signed token that you can use to call other endpoints of Litmus API, for example /secret.
+
 **DEMO:**
+
+    curl --location --request POST 'http://localhost:3000/api/v1/challengecode' \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+        "address": "14GgSVJ1unwjVw4CuMGXYz4P4yT1HzVqEDEiExhiCS84EGQo"
+    }'
 
     curl --location --request POST 'http://localhost:3000/api/v1/signin' \
     --header 'Content-Type: application/json' \
     --data-raw '{
         "username": "14GgSVJ1unwjVw4CuMGXYz4P4yT1HzVqEDEiExhiCS84EGQo",
-        "message": "Sign-in request for address 14GgSVJ1unwjVw4CuMGXYz4P4yT1HzVqEDEiExhiCS84EGQo.",
-        "signature": "0xfc03197bd2110f613677913e3d52afbc1ecda9099109f01300a97acde7122d305d87d115cf173632319c6666d829a4585a45462cb3d2df5513f7d5a68c9f1785"
+        "message": "Sign-in request for address 14GgSVJ1unwjVw4CuMGXYz4P4yT1HzVqEDEiExhiCS84EGQo and challenge code ff27a34ee04346ba820b5d2460349d4f..",
+        "signature": "0xfc03197bd2110f613677913e3d52afbc1ecda9099109f01300a97acde7122d305d87d115cf173632319c6666d829a4585a45462cb3d2df5513f7d5a68c9f1785",
+        "challengeCode": "ff27a34ee04346ba820b5d2460349d4f"
     }'
 	    
     curl --location --request GET 'http://localhost:3000/api/v1/secret' \
