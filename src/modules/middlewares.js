@@ -5,7 +5,9 @@ export function errorHandler(err, req, res, next) {
   if (isCustom) {
     res.status(err.status);
     res.json(err);
-    return;
+  } else {
+    res.status(500);
+    res.json(new ServerError('Oops! something went wrong.'));
   }
   next();
 }

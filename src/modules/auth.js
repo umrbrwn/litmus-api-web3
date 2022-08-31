@@ -1,43 +1,25 @@
-import crypto from 'crypto';
 import fs from 'fs';
+import { cryptoWaitReady, decodeAddress, signatureVerify } from '@polkadot/util-crypto';
+import { u8aToHex } from '@polkadot/util';
 import passport from 'passport';
 import passportBearer from 'passport-http-bearer';
 import jwt from 'jsonwebtoken';
 import { DateTime } from 'luxon';
 
-import User, { validations } from '../models/User.js';
+import { validations } from '../models/User.js';
 import { CustomError, ServerError } from './error.js';
+
+//Some interfaces, such as using sr25519 however are only available via WASM
+await cryptoWaitReady();
 
 // load security certificates, in case something goes wrong, just fail loudly
 const privateKey = fs.readFileSync(`${process.cwd()}/certs/cert.pem`).toString();
 const publicKey = fs.readFileSync(`${process.cwd()}/certs/cert.pem.pub`).toString();
 
-
-const hashPassword = (password, salt) => {
-  return new Promise((resolve, reject) => {
-    crypto.pbkdf2(password, salt, 310000, 32, 'sha256', (err, hash) => {
-      if (err) { reject(err); }
-      resolve(hash.toString('hex'));
-    });
-  });
-};
-
-const validatePassword = async (user, password) => {
-  try {
-    const inputPasswordHash = await hashPassword(password, user.salt);
-    const inputPasswordHashBuff = Buffer.from(inputPasswordHash, 'hex');
-    const userPasswordHashBuff = Buffer.from(user.passwordHash, 'hex');
-    return crypto.timingSafeEqual(inputPasswordHashBuff, userPasswordHashBuff);
-  } catch (err) {
-    global.log.error(err, 'Failed to validate password.');
-  }
-  return false;
-};
-
-const generateToken = async (user) => {
+const generateToken = async (username) => {
   const payload = {
-    iss: 'urn:litentry-auth',
-    sub: user.username,
+    iss: 'urn:litentry-auth-web3',
+    sub: username,
     iat: DateTime.utc().toUnixInteger()
   };
   return new Promise((resolve, reject) => {
@@ -51,58 +33,44 @@ const generateToken = async (user) => {
   });
 };
 
-const signin = async (username, password) => {
-  const user = await User.findByUsername(username);
-  if (!user) {
-    throw new CustomError({ message: 'User not found.', status: 404 });
-  }
-  const isPasswordValid = await validatePassword(user, password);
-  if (!isPasswordValid) {
-    try {
-      await User.countLoginFailed(user.username);
-    } catch (err) {
-      global.log.error(err, 'Failed to update login-failed count.');
-    }
-    throw new CustomError({ message: 'Incorrect username or password.', status: 401 });
-  }
+const isValidSignature = (message, signature, username) => {
+  // username aka address
+  let isValid = false;
   try {
-    const token = await generateToken(user);
-    return token;
+    const address = decodeAddress(username);
+    const hexAddress = u8aToHex(address);
+    isValid = signatureVerify(message, signature, hexAddress).isValid;
   } catch (err) {
-    throw new ServerError('Unable to login.');
+    global.log.info(err, 'Failed to validate signature.');
   }
+  return isValid;
 };
 
-const signup = async (username, password) => {
-  const { error } = validations.newUser.validate({ username, password }, { abortEarly: false });
+const signin = async (username, message, signature) => {
+  const { error } = validations.user.validate({ username, message, signature });
   if (error) {
     throw new CustomError(error);
   }
+  const isSigValid = isValidSignature(message, signature, username);
+  if (!isSigValid) {
+    throw new CustomError({ message: 'Invalid username or signature.', status: 401 });
+  }
   try {
-    const salt = crypto.randomBytes(32).toString('hex');
-    const passwordHash = await hashPassword(password, salt);
-    await User.createUser({ username, passwordHash, salt });
+    return await generateToken(username);
   } catch (err) {
-    global.log.error(err, 'Failed to sing-up user account.');
-    throw new CustomError('Unable to login.');
+    throw new ServerError('Unable to login.');
   }
 };
 
 passport.use(new passportBearer.Strategy(async (token, done) => {
   try {
     const decoded = jwt.verify(token, publicKey, { algorithms: ['RS256'] });
-    const { sub } = decoded;
-    const user = await User.findByUsername(sub);
-    if (!user) {
-      global.log.error(err, 'Token was verified, but the user not found.');
-      done(null, false);
-    }
-    // TODO: remove extra details from user - pass and hash etc
-    done(null, user, { scope: 'read' });
+    const { sub: username } = decoded;
+    done(null, { username }, { scope: 'read' });
   } catch (err) {
     global.log.error(err, 'Failed to verify bearer token.');
     return done(new CustomError({ message: 'Invalid token.', status: 401 }));
   }
 }));
 
-export { passport, signin, signup };
+export { passport, signin };
