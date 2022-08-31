@@ -4,10 +4,12 @@ import { u8aToHex } from '@polkadot/util';
 import passport from 'passport';
 import passportBearer from 'passport-http-bearer';
 import jwt from 'jsonwebtoken';
-import { DateTime } from 'luxon';
+import { DateTime, Interval } from 'luxon';
+import { v4 as uuidv4 } from 'uuid';
 
-import { validations } from '../models/User.js';
 import { CustomError, ServerError } from './error.js';
+import { validations } from '../models/User.js';
+import ChallengeCode from '../models/ChallengeCode.js';
 
 //Some interfaces, such as using sr25519 however are only available via WASM
 await cryptoWaitReady();
@@ -33,7 +35,7 @@ const generateToken = async (username) => {
   });
 };
 
-const isValidSignature = (message, signature, username) => {
+const validateSignature = (message, signature, username) => {
   // username aka address
   let isValid = false;
   try {
@@ -46,17 +48,53 @@ const isValidSignature = (message, signature, username) => {
   return isValid;
 };
 
-const signin = async (username, message, signature) => {
-  const { error } = validations.user.validate({ username, message, signature });
+const getActiveChallengeCode = async (address) => {
+  let unused = await ChallengeCode.findUnused(address);
+  if (unused) {
+    const at = DateTime.fromJSDate(unused.createdAt);
+    const now = DateTime.now().toUTC();
+    const diff = Interval.fromDateTimes(at, now).length('seconds');
+    const expiry = (3 * 60); // 3min in sec
+    if (diff <= expiry) {
+      return unused.challenge;
+    }
+    // delete older challenge codes
+    await ChallengeCode.delete(unused.challengeCodeId);
+    return null;
+  }
+};
+
+const takeChallengeCode = async (address) => {
+  let code = await getActiveChallengeCode(address);
+  if (!code) {
+    code = uuidv4().replaceAll('\-', '');
+    await ChallengeCode.create(address, code);
+  }
+  return code;
+};
+
+const validateChallengeCode = async (address, code) => {
+  const active = await getActiveChallengeCode(address);
+  return (!!active ? active === code : false);
+};
+
+const signin = async (username, message, signature, challengeCode) => {
+  const { error } = validations.user.validate({ username, message, signature, challengeCode });
   if (error) {
     throw new CustomError(error);
   }
-  const isSigValid = isValidSignature(message, signature, username);
-  if (!isSigValid) {
+  const challengeCodeValid = await validateChallengeCode(username, challengeCode);
+  if (!challengeCodeValid) {
+    throw new CustomError({ message: 'Your challenge code has expired.', status: 401 });
+  }
+  const sigValid = validateSignature(message, signature, username);
+  if (!sigValid) {
     throw new CustomError({ message: 'Invalid username or signature.', status: 401 });
   }
   try {
-    return await generateToken(username);
+    const token = await generateToken(username);
+    await ChallengeCode.use(username, challengeCode);
+    return token;
   } catch (err) {
     throw new ServerError('Unable to login.');
   }
@@ -73,4 +111,4 @@ passport.use(new passportBearer.Strategy(async (token, done) => {
   }
 }));
 
-export { passport, signin };
+export { passport, takeChallengeCode, signin };

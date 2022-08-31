@@ -14,3 +14,11 @@ model Secretes {
   secretId Int @id @default(autoincrement())
   message String
 }
+
+model ChallengeCodes {
+  challengeCodeId Int @id @default(autoincrement())
+  challenge String
+  requester String
+  createdAt DateTime @default(now())
+  usedAt DateTime?
+}

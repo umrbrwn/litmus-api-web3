@@ -6,6 +6,7 @@ export function errorHandler(err, req, res, next) {
     res.status(err.status);
     res.json(err);
   } else {
+    global.log.error(err);
     res.status(500);
     res.json(new ServerError('Oops! something went wrong.'));
   }
