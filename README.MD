@@ -9,6 +9,9 @@ Its token authenticated API that returns random magic strings from Postgres.
 
 The app uses some of the famous npm packages, i.e. `express`, `joi`, `dotenv`, `prisma` ORM, `passport`, `pino` logger with ECS formatting, `luxon` etc.
 
+**Web3 Version:**
+Switch to `dev` branch for Web3 version, that uses Polkadot account for auth.
+
 **DEMO:**
 
     curl --location --request POST 'http://localhost:3000/api/v1/signin' \
