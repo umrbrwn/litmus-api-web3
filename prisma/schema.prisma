@@ -10,19 +10,15 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Users {
-  userId Int @id @default(autoincrement())
-  username String @db.VarChar(100)
-  passwordHash String
-  salt String
-  failedLoginCount Int
-  createdAt DateTime @default(now())
-
-  @@unique([username])
-  @@index([username])
-}
-
 model Secretes {
   secretId Int @id @default(autoincrement())
   message String
+}
+
+model ChallengeCodes {
+  challengeCodeId Int @id @default(autoincrement())
+  challenge String
+  requester String
+  createdAt DateTime @default(now())
+  usedAt DateTime?
 }

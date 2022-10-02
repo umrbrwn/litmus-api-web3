@@ -1,21 +1,21 @@
-import { signin, signup } from '../modules/auth.js';
+import { takeChallengeCode, signin } from '../modules/auth.js';
 
 export default class UserController {
-  static async trySignin(req, res, next) {
-    const { username, password } = req.body;
-    // if the user exist then log them in, otherwise create their account
+  static async takeChallengeCode(req, res, next) {
+    const { address } = req.body;
     try {
-      const result = await signin(username, password);
-      res.json({ token: result });
-      return next();
+      const challengeCode = await takeChallengeCode(address);
+      res.json({ challengeCode });
     } catch (err) {
-      if (err.status !== 404) {
-        return next(err);
-      }
+      next(err);
     }
+  }
+
+  static async signin(req, res, next) {
+    const { username, message, signature, challengeCode } = req.body;
     try {
-      await signup(username, password);
-      res.status(201).send();
+      const result = await signin(username, message, signature, challengeCode);
+      res.json({ token: result });
     } catch (err) {
       next(err);
     }

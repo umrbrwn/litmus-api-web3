@@ -4,8 +4,13 @@ import { passport } from '../modules/auth.js';
 
 export function setup(app, router) {
   router.post(
+    '/api/v1/challengecode',
+    UserController.takeChallengeCode
+  );
+
+  router.post(
     '/api/v1/signin',
-    UserController.trySignin
+    UserController.signin
   );
 
   router.get(
